@@ -7,9 +7,8 @@
 
 #include "quill/LogMacros.h"
 
-#include <cfloat>
 #include <cmath>
-#include <cstdlib>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -27,7 +26,7 @@ auto_aim::Trajectory::getArmorFacingAngleAbs(const ArmorPositionYaw &armor) {
 auto_aim::ArmorIndex
 auto_aim::Trajectory::selectArmor(const TargetState &state) const {
   auto armors = state.armors();
-  auto min_facing_angle_abs = DBL_MAX;
+  auto min_facing_angle_abs = std::numeric_limits<double>::max();
   ArmorIndex selected_index;
   for (auto i = 0; i < armors.size(); i++) {
     auto armor = armors.at(i);
@@ -65,7 +64,6 @@ std::optional<auto_aim::YawPitchFlyTimeIndex>
 auto_aim::Trajectory::solveTarget(const TargetState &target_state,
                                   double bullet_speed, bool iterative_fly_time,
                                   bool use_rk45) {
-  // XXX: 绝大多数情况没有并发。有点开销但不多
   static auto last_target_type{target_state.type};
   if (last_target_type != target_state.type) {
     last_armor_index_ = std::nullopt;
@@ -96,7 +94,7 @@ std::optional<auto_aim::YawPitchFlyTimeIndex> auto_aim::Trajectory::solveArmor(
     double bullet_speed, bool iterative_fly_time, bool use_rk45) const {
   auto method = use_rk45 ? tools::ballistic::Method::rk45
                          : tools::ballistic::Method::parabola;
-  double error = DBL_MAX;
+  double error = std::numeric_limits<double>::max();
   int iterative_count{0};
   YawPitchFlyTimeIndex result;
   do {
@@ -107,7 +105,8 @@ std::optional<auto_aim::YawPitchFlyTimeIndex> auto_aim::Trajectory::solveArmor(
     auto armor = target_state.predict(fly_time).armors().at(
         static_cast<int>(armor_index));
     if (auto facing_angle_abs = getArmorFacingAngleAbs(armor);
-        facing_angle_abs > config_.iterative_max_facing_angle) {
+        facing_angle_abs >
+        tools::angle2Radian(config_.iterative_max_facing_degree)) {
       LOG_WARNING(logger_, "[Trajectory]: facing_angle_abs {}. Abandon!",
                   facing_angle_abs);
       return std::nullopt;

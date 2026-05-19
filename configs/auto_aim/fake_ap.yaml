@@ -15,7 +15,7 @@ robot_conf:
   tf_query_tolerance_ms: 200.0
   startup_position_xy_m: [3.0, 0.0]
   startup_yaw_degree: 0.0
-  startup_vel_yaw_degree_s: 700.0
+  startup_vel_yaw_degree_s: 100.0
   startup_const_speed_spin: true
   camera_pos: [0.,0.]
   camera_name: camera0

@@ -96,12 +96,18 @@ msgs::AimCommand auto_aim::Planner::plan(
   auto cmd =
       aimMPC(target_state.predict(predict_time_cache_),
              gimbal_info.bullet_speed, fly_time_cache_, selected_index_cache_);
-  if (cmd.control) // 避免未更新的selected_index_cache造成前哨的越界访问
+  if (cmd.control) {
+    // 避免未更新的selected_index_cache造成前哨的越界访问
     fire_controller_.calculateFireThres(
         cmd, gimbal_info.bullet_speed, target_state.type,
         target_state.predict(predict_time_cache_ + fly_time_cache_)
             .armors()
             .at(static_cast<int>(selected_index_cache_)));
+  } else {
+    yaw_fire_thres_ = 0;
+    pitch_fire_thres_ = 0;
+    return cmd;
+  }
   cmd.target_yaw = tools::limitRadian(cmd.target_yaw + config_.yaw_offset);
   cmd.target_pitch =
       tools::limitRadian(cmd.target_pitch + config_.pitch_offset);
@@ -205,7 +211,7 @@ auto_aim::Planner::buildReferenceTrajectory(const TargetState &target_state,
   target_state_d = target_state_d.predict(config_.dt_sec);
   auto current_solution_optional =
       trajectory_solver_.solveTarget(target_state_d, bullet_speed_mps,
-                                     config_.rk45_traj, config_.iterative_traj);
+                                     config_.iterative_traj, config_.rk45_traj);
   if (!current_solution_optional.has_value()) {
     reference.fallback_sample_count++;
     LOG_TRACE_L1(
@@ -223,8 +229,8 @@ auto_aim::Planner::buildReferenceTrajectory(const TargetState &target_state,
     YawPitchFlyTimeIndex next_solution;
     double yaw_vel, pitch_vel;
     auto next_solution_opt = trajectory_solver_.solveTarget(
-        target_state_d, bullet_speed_mps, config_.rk45_traj,
-        config_.iterative_traj);
+        target_state_d, bullet_speed_mps, config_.iterative_traj,
+        config_.rk45_traj);
     next_solution = next_solution_opt.has_value() ? next_solution_opt.value()
                                                   : current_solution;
     if (!next_solution_opt.has_value()) {

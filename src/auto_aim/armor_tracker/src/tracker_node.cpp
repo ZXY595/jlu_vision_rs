@@ -198,6 +198,10 @@ auto_aim::TrackerNode::TrackerNode(quill::Logger *logger,
         plotter_.plot("gimbal_pitch_vel", tools::radian2Angle(pitch_vel));
         plotter_.plot("gimbal_yaw_vel", tools::radian2Angle(yaw_vel));
         plotter_.plot("bullet_speed", bullet_speed);
+        plotter_.plot("yaw_error",
+                      tools::radian2Angle(std::abs(yaw - cmd.yaw)));
+        plotter_.plot("pitch_error",
+                      tools::radian2Angle(std::abs(pitch - cmd.pitch)));
       }
       std::this_thread::sleep_for(std::chrono::milliseconds{
           static_cast<int>(configs_.planner_conf.dt_sec * 1000)});
