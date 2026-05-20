@@ -14,7 +14,6 @@
 #include "msgs/Armor.hpp"
 #include "msgs/Header.hpp"
 #include "msgs/Image.hpp"
-#include "opencv2/imgcodecs.hpp"
 #include "planner.hpp"
 #include "target.hpp"
 #include "types.hpp"
@@ -33,6 +32,7 @@
 #include "opencv2/core/mat.hpp"
 #include "opencv2/core/types.hpp"
 #include "opencv2/highgui.hpp"
+#include "opencv2/imgcodecs.hpp"
 #include "quill/LogMacros.h"
 #include "rfl/enums.hpp"
 #include <Eigen/Dense>

@@ -21,6 +21,7 @@ struct ArmorObservationNoiseConfig {
 struct RobotConfig {
   double max_match_distance_m;
   double max_match_yaw_diff_degree;
+  double max_match_mahalanobis_distance;
   int first_update_batch_size; // 冷启动时第一次优化时最少的k
   double lost_threshold_sec;   // 超时重置因子图的阈值
   // 先验噪声

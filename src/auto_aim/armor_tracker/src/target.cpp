@@ -53,6 +53,31 @@ std::vector<auto_aim::ArmorMatchResult> auto_aim::Target::matchArmor(
   return results;
 }
 
+std::vector<auto_aim::ArmorMatchResult> auto_aim::Target::matchArmor(
+    const std::vector<std::pair<ArmorPositionYaw, Eigen::Matrix4d>>
+        &armors_covs,
+    const ArmorPositionYaw &obs, double match_thres) {
+  std::vector<ArmorMatchResult> results;
+  std::size_t i = 0;
+  for (const auto &[armor, cov] : armors_covs) {
+    auto dx = obs.position.x() - armor.position.x();
+    auto dy = obs.position.y() - armor.position.y();
+    auto dz = obs.position.z() - armor.position.z();
+    auto dr = armor.yaw.localCoordinates(obs.yaw).x();
+    Eigen::Vector4d error{dx, dy, dz, dr};
+    double mahalanobis_distance = error.transpose() * cov.ldlt().solve(error);
+    if (mahalanobis_distance < match_thres)
+      results.emplace_back(static_cast<ArmorIndex>(i), mahalanobis_distance,
+                           dr);
+    ++i;
+  }
+  // 马氏距离贪心
+  std::ranges::sort(results, std::ranges::less{}, &ArmorMatchResult::distance);
+  if (!results.empty())
+    std::cout << results.front().distance << std::endl;
+  return results;
+}
+
 auto_aim::RobotTarget::RobotTarget(quill::Logger *logger,
                                    const RobotConfig &config,
                                    types::ArmorType type,
@@ -100,19 +125,38 @@ auto_aim::RobotTarget::getArmorsFromTargetState(
 std::vector<
     std::pair<auto_aim::ArmorPositionRollPitchYawPoints, auto_aim::ArmorIndex>>
 auto_aim::RobotTarget::matchArmors(
-    const RobotTargetState &state,
+    const RobotTargetState &state, double dt,
     const std::vector<ArmorPositionRollPitchYawPoints> &obs_armors_camera,
     const std::vector<ArmorPositionRollPitchYawPoints> &obs_armors_odom) const {
+  Eigen::Matrix3d cov_X_pred = X_cov_ + V_cov_ * (dt * dt);
+  cov_X_pred.diagonal() += Eigen::Vector3d{
+      config_.translation_factor_noise.x * dt * dt,
+      config_.translation_factor_noise.y * dt * dt,
+      config_.translation_factor_noise.z * dt * dt,
+  };
+  double cov_R_pred = R_cov_ + W_cov_ * dt * dt;
+  cov_R_pred += config_.yaw_factor_noise * dt * dt;
+  Eigen::Matrix4d center_cov = Eigen::Matrix4d::Zero();
+  center_cov.topLeftCorner<3, 3>() = cov_X_pred;
+  center_cov(3, 3) = cov_R_pred;
   auto armors = RobotTarget::getArmorsFromTargetState(state);
+  std::vector<std::pair<ArmorPositionYaw, Eigen::Matrix4d>> armors_covs;
+  for (const auto &armor : armors) {
+    Eigen::Vector3d offset = armor.position - state.center_position;
+    Eigen::Matrix4d J = Eigen::Matrix4d::Identity();
+    J(0, 3) = -offset.y();
+    J(1, 3) = offset.x();
+    Eigen::Matrix4d armor_cov = J * center_cov * J.transpose();
+    armors_covs.emplace_back(armor, armor_cov);
+  }
   std::vector<std::pair<ArmorPositionRollPitchYawPoints, ArmorIndex>>
       matched_armors;
   std::array<bool, 4> used_index{false, false, false, false};
   for (std::size_t i = 0;
        i < obs_armors_camera.size() && i < obs_armors_odom.size(); ++i) {
     const auto &obs = obs_armors_odom.at(i);
-    auto result = Target::matchArmor(
-        armors, obs, config_.max_match_distance_m,
-        tools::angle2Radian(config_.max_match_yaw_diff_degree));
+    auto result = Target::matchArmor(armors_covs, obs,
+                                     config_.max_match_mahalanobis_distance);
     if (!result.empty() &&
         !used_index.at(static_cast<int>(result.front().index))) {
       matched_armors.emplace_back(obs_armors_camera.at(i),
@@ -431,7 +475,7 @@ auto_aim::RobotTarget::update(
     target_state = getTargetStateFromArmor(obs_armors_odom.front());
   }
 
-  auto matched_armors = matchArmors(target_state, armors, obs_armors_odom);
+  auto matched_armors = matchArmors(target_state, dt, armors, obs_armors_odom);
   if (matched_armors.size() < obs_armors_odom.size()) {
     LOG_DEBUG(logger_, "[Target {}]: Miss match {} armors! k = {}.",
               rfl::enum_to_string(target_state.type),
@@ -477,6 +521,10 @@ auto_aim::RobotTarget::update(
         tools::logisticFunction(isam2_.calculateEstimate<double>(B(0)),
                                 config_.radius_min, config_.radius_max);
     target_state.dz = isam2_.calculateEstimate<double>(Z(0));
+    this->X_cov_ = isam2_.marginalCovariance(X(track_state_.k));
+    this->V_cov_ = isam2_.marginalCovariance(V(track_state_.k));
+    this->R_cov_ = isam2_.marginalCovariance(R(track_state_.k))(0, 0);
+    this->W_cov_ = isam2_.marginalCovariance(W(track_state_.k))(0, 0);
     return {target_state, matched_armors.empty() ? TrackState::State::TEMPLOST
                                                  : TrackState::State::TRACKING};
   } catch (const std::exception &e) {

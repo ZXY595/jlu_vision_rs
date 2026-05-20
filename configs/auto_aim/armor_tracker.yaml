@@ -20,6 +20,7 @@ serial_topic:
 robot_conf:
   first_update_batch_size: 1
   max_match_distance_m: 1.0
+  max_match_mahalanobis_distance: 15000.0
   max_match_yaw_diff_degree: 40.0
   lost_threshold_sec: 0.3
   yaw_prior_noise: 9.0
@@ -53,7 +54,7 @@ robot_conf:
       x: 1.0
       y: 1.0
     tangential_error_m: 0.01
-    radial_error_m: 0.01
+    radial_error_m: 0.03
     height_error_m: 0.01
     yaw_error_rad: 0.005
 
