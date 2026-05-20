@@ -1,0 +1,28 @@
+[package]
+name = "jlu_vision"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "jlu_vision"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+async-channel = "2"
+async-serial = "0.2.0"
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.11"
+factrs = "0.3.0"
+futures-lite = "2"
+image = "0.25"
+log = "0.4"
+nalgebra = "0.34"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+smol = "2"
+strum = { version = "0.28", features = ["derive"] }
+thiserror = "2"
+
+[dev-dependencies]
+approx = "0.5"
